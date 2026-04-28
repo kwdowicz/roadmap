@@ -1,0 +1,1710 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Observability & Monitoring Roadmap</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/d3@7/dist/d3.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    html, body { background: #FAFAF7; }
+    body { margin: 0; font-family: 'IBM Plex Sans', sans-serif; }
+
+    .font-display { font-family: 'Fraunces', serif !important; font-optical-sizing: auto; }
+    .font-body { font-family: 'IBM Plex Sans', sans-serif !important; }
+    .font-mono { font-family: 'IBM Plex Mono', monospace !important; }
+
+    .grid-bg {
+      background-image:
+        linear-gradient(rgba(15, 20, 25, 0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(15, 20, 25, 0.025) 1px, transparent 1px);
+      background-size: 32px 32px;
+    }
+
+    .fade-in { animation: fadeIn 0.4s ease-out; }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .panel-enter { animation: panelEnter 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+    @keyframes panelEnter {
+      from { opacity: 0; transform: translateX(20px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+
+    .gantt-bar { transition: all 0.2s ease-out; }
+    .gantt-bar:hover { filter: brightness(0.92); }
+
+    .heatmap-cell { transition: all 0.15s ease-out; }
+    .heatmap-cell:hover { transform: scale(1.05); }
+
+    .number-tick { font-variant-numeric: tabular-nums; }
+
+    .scrollable-y::-webkit-scrollbar { width: 6px; height: 6px; }
+    .scrollable-y::-webkit-scrollbar-track { background: transparent; }
+    .scrollable-y::-webkit-scrollbar-thumb { background: #D6D2CB; border-radius: 3px; }
+    .scrollable-y::-webkit-scrollbar-thumb:hover { background: #8B8680; }
+
+    .drop-zone {
+      border: 2px dashed #D6D2CB;
+      transition: all 0.2s ease-out;
+    }
+    .drop-zone.dragover {
+      border-color: #0F1419;
+      background-color: #F5F2EB;
+      transform: scale(1.01);
+    }
+
+    #loader {
+      position: fixed; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      background: #FAFAF7; z-index: 100;
+      transition: opacity 0.3s ease-out;
+    }
+    #loader.hidden { opacity: 0; pointer-events: none; }
+    .loader-bar {
+      width: 200px; height: 2px; background: #E8E5DE;
+      margin-top: 16px; overflow: hidden;
+    }
+    .loader-bar::after {
+      content: ''; display: block; width: 40%; height: 100%;
+      background: #0F1419;
+      animation: loaderSlide 1.2s ease-in-out infinite;
+    }
+    @keyframes loaderSlide {
+      0% { transform: translateX(-100%); }
+      100% { transform: translateX(350%); }
+    }
+  </style>
+</head>
+<body>
+  <div id="loader">
+    <div style="font-family: 'Fraunces', serif; font-size: 24px; color: #0F1419; font-weight: 400; letter-spacing: -0.01em;">
+      Observability <em style="font-weight: 300;">&</em> Monitoring
+    </div>
+    <div style="font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #8B8680; letter-spacing: 0.1em; text-transform: uppercase; margin-top: 8px;">
+      Loading roadmap…
+    </div>
+    <div class="loader-bar"></div>
+  </div>
+
+  <div id="root"></div>
+
+  <script type="text/babel" data-presets="react">
+    const { useState, useEffect, useRef, useMemo, useContext, createContext, Fragment } = React;
+
+    // ====================================================================
+    // ICONS
+    // ====================================================================
+
+    const IconBase = ({ children, size = 24, strokeWidth = 2, ...props }) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" {...props}>
+        {children}
+      </svg>
+    );
+
+    const Calendar = (props) => (
+      <IconBase {...props}>
+        <rect width="18" height="18" x="3" y="4" rx="2"/>
+        <line x1="3" x2="21" y1="10" y2="10"/>
+        <path d="M8 2v4"/><path d="M16 2v4"/>
+      </IconBase>
+    );
+    const GitBranch = (props) => (
+      <IconBase {...props}>
+        <line x1="6" x2="6" y1="3" y2="15"/>
+        <circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/>
+        <path d="M18 9a9 9 0 0 1-9 9"/>
+      </IconBase>
+    );
+    const Grid3x3 = (props) => (
+      <IconBase {...props}>
+        <rect width="18" height="18" x="3" y="3" rx="2"/>
+        <path d="M3 9h18"/><path d="M3 15h18"/>
+        <path d="M9 3v18"/><path d="M15 3v18"/>
+      </IconBase>
+    );
+    const X = (props) => (
+      <IconBase {...props}><path d="M18 6 6 18"/><path d="m6 6 12 12"/></IconBase>
+    );
+    const Activity = (props) => (
+      <IconBase {...props}>
+        <path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.5.5 0 0 1-.96 0L9.68 3.18a.5.5 0 0 0-.96 0l-2.35 8.36A2 2 0 0 1 4.44 13H2"/>
+      </IconBase>
+    );
+    const Layers = (props) => (
+      <IconBase {...props}>
+        <path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/>
+        <path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12"/>
+        <path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"/>
+      </IconBase>
+    );
+    const TrendingUp = (props) => (
+      <IconBase {...props}>
+        <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/>
+        <polyline points="16 7 22 7 22 13"/>
+      </IconBase>
+    );
+    const Eye = (props) => (
+      <IconBase {...props}>
+        <path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/>
+        <circle cx="12" cy="12" r="3"/>
+      </IconBase>
+    );
+    const RefreshCw = (props) => (
+      <IconBase {...props}>
+        <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
+        <path d="M21 3v5h-5"/>
+        <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
+        <path d="M8 16H3v5"/>
+      </IconBase>
+    );
+    const FileText = (props) => (
+      <IconBase {...props}>
+        <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/>
+        <path d="M14 2v4a2 2 0 0 0 2 2h4"/>
+        <path d="M10 9H8"/>
+        <path d="M16 13H8"/>
+        <path d="M16 17H8"/>
+      </IconBase>
+    );
+
+    const ICON_MAP = {
+      'activity': Activity,
+      'layers': Layers,
+      'trending-up': TrendingUp,
+      'trendingup': TrendingUp,
+      'eye': Eye
+    };
+
+    const stakeholders = [
+      { id: 'sre', label: 'SRE', sublabel: 'Running the service' },
+      { id: 'dev', label: 'Developers', sublabel: 'Writing the code' },
+      { id: 'client', label: 'Clients', sublabel: 'Paying for the service' },
+      { id: 'business', label: 'Business', sublabel: 'Leadership & commercial' }
+    ];
+
+    const colors = {
+      bg: '#FAFAF7',
+      surface: '#FFFFFF',
+      ink: '#0F1419',
+      inkSoft: '#3A3530',
+      muted: '#8B8680',
+      border: '#E8E5DE',
+      borderStrong: '#1F2937',
+      accent: '#1F2937'
+    };
+
+    // ====================================================================
+    // MARKDOWN PARSER
+    // ====================================================================
+
+    function splitByLevel2(text) {
+      // Returns { sectionName: [lines] }
+      const sections = {};
+      const lines = text.split('\n');
+      let currentName = null;
+      let buffer = [];
+      for (const line of lines) {
+        // Treat lines starting with > as comments and skip
+        if (line.trim().startsWith('>')) continue;
+        if (line.startsWith('## ')) {
+          if (currentName) sections[currentName] = buffer;
+          currentName = line.replace(/^##\s+/, '').trim();
+          buffer = [];
+        } else {
+          buffer.push(line);
+        }
+      }
+      if (currentName) sections[currentName] = buffer;
+      return sections;
+    }
+
+    function splitByLevel3(lines) {
+      // Returns array of { header, lines }
+      const blocks = [];
+      let current = null;
+      for (const line of lines) {
+        if (line.startsWith('### ')) {
+          if (current) blocks.push(current);
+          current = { header: line.replace(/^###\s+/, '').trim(), lines: [] };
+        } else if (current) {
+          current.lines.push(line);
+        }
+      }
+      if (current) blocks.push(current);
+      return blocks;
+    }
+
+    function parseBulletFields(lines) {
+      // Parses leading bullet metadata: "- Key: value"
+      // Returns { fields, remainingLines }
+      const fields = {};
+      let i = 0;
+      while (i < lines.length) {
+        const line = lines[i];
+        const trimmed = line.trim();
+        if (trimmed === '') { i++; continue; }
+        const m = trimmed.match(/^-\s+([^:]+):\s*(.*)$/);
+        if (m) {
+          fields[m[1].trim()] = m[2].trim();
+          i++;
+        } else {
+          break;
+        }
+      }
+      return { fields, remainingLines: lines.slice(i) };
+    }
+
+    function parseDescAndDeliverable(lines) {
+      // After bullets, the rest is description + **Deliverable:** ...
+      let descLines = [];
+      let delivLines = [];
+      let inDeliverable = false;
+      for (const line of lines) {
+        const delivMatch = line.match(/^\*\*Deliverable:\*\*\s*(.*)$/);
+        if (delivMatch) {
+          inDeliverable = true;
+          if (delivMatch[1]) delivLines.push(delivMatch[1]);
+          continue;
+        }
+        if (inDeliverable) {
+          delivLines.push(line);
+        } else {
+          descLines.push(line);
+        }
+      }
+      const description = descLines.join('\n').trim().replace(/\n\s*\n/g, '\n\n');
+      const deliverable = delivLines.join(' ').trim();
+      return { description, deliverable };
+    }
+
+    function parseMilestones(lines) {
+      const result = {};
+      const blocks = splitByLevel3(lines);
+      for (const block of blocks) {
+        const m = block.header.match(/^(M\d+):\s*(.+)$/);
+        if (!m) continue;
+        const id = m[1];
+        const name = m[2].trim();
+        const { fields, remainingLines } = parseBulletFields(block.lines);
+        const description = remainingLines.join('\n').trim();
+        const iconKey = (fields.Icon || 'activity').toLowerCase().replace(/\s+/g, '');
+        result[id] = {
+          name,
+          color: fields.Color || '#1F2937',
+          light: fields.Light || '#E5E7EB',
+          icon: ICON_MAP[iconKey] || Activity,
+          description
+        };
+      }
+      return result;
+    }
+
+    function parsePhases(lines) {
+      const phases = [];
+      for (const line of lines) {
+        const m = line.match(/^\d+\.\s+(.+)$/);
+        if (m) phases.push(m[1].trim());
+      }
+      return phases;
+    }
+
+    function parseTasks(lines) {
+      const tasks = [];
+      const blocks = splitByLevel3(lines);
+      for (const block of blocks) {
+        const m = block.header.match(/^(\d+\.\d+)\s+(.+)$/);
+        if (!m) continue;
+        const id = m[1];
+        const title = m[2].trim();
+        const { fields, remainingLines } = parseBulletFields(block.lines);
+        const { description, deliverable } = parseDescAndDeliverable(remainingLines);
+
+        // Parse weeks "1-2"
+        const weeksMatch = (fields.Weeks || '1-1').match(/(\d+)\s*-\s*(\d+)/);
+        const startWeek = weeksMatch ? parseInt(weeksMatch[1]) : 1;
+        const endWeek = weeksMatch ? parseInt(weeksMatch[2]) : 1;
+
+        // Parse depends "1.1, 1.2"
+        const depsRaw = (fields.Depends || '').trim();
+        const deps = depsRaw === '' || depsRaw === '-' ? [] :
+          depsRaw.split(',').map(s => s.trim()).filter(Boolean);
+
+        // Parse value "SRE=3, Dev=1, Client=5, Business=5"
+        const value = { sre: 0, dev: 0, client: 0, business: 0 };
+        const valueParts = (fields.Value || '').split(',');
+        for (const part of valueParts) {
+          const vm = part.match(/(\w+)\s*=\s*(\d+)/);
+          if (vm) {
+            const key = vm[1].toLowerCase();
+            const val = parseInt(vm[2]);
+            if (key in value) value[key] = val;
+          }
+        }
+
+        tasks.push({
+          id, title,
+          phase: fields.Phase || '',
+          milestone: fields.Milestone || 'M1',
+          startWeek, endWeek, deps,
+          description, deliverable, value
+        });
+      }
+      return tasks;
+    }
+
+    function parseOutcomeSection(lines) {
+      // Returns { M1: [...], M2: [...], ... }
+      const result = {};
+      const blocks = splitByLevel3(lines);
+      for (const block of blocks) {
+        const id = block.header.trim();
+        const items = [];
+        for (const line of block.lines) {
+          const m = line.match(/^[-*]\s+(.+)$/);
+          if (m) items.push(m[1].trim());
+        }
+        result[id] = items;
+      }
+      return result;
+    }
+
+    function parseRoadmapData(text) {
+      const sections = splitByLevel2(text);
+      const six = parseOutcomeSection(sections['6-Month Outcomes'] || []);
+      const twelve = parseOutcomeSection(sections['12-Month Outcomes'] || []);
+
+      const outcomeKeys = new Set([...Object.keys(six), ...Object.keys(twelve)]);
+      const horizonOutcomes = {};
+      for (const k of outcomeKeys) {
+        horizonOutcomes[k] = {
+          sixMonth: six[k] || [],
+          twelveMonth: twelve[k] || []
+        };
+      }
+
+      return {
+        milestones: parseMilestones(sections['Milestones'] || []),
+        phases: parsePhases(sections['Phases'] || []),
+        tasks: parseTasks(sections['Tasks'] || []),
+        horizonOutcomes
+      };
+    }
+
+    // ====================================================================
+    // DATA CONTEXT
+    // ====================================================================
+
+    const DataContext = createContext(null);
+
+    // ====================================================================
+    // FILE LOADER (for file:// usage)
+    // ====================================================================
+
+    const FileLoader = ({ onLoad, fetchError }) => {
+      const [dragOver, setDragOver] = useState(false);
+      const fileInputRef = useRef(null);
+
+      const handleFile = (file) => {
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const text = e.target.result;
+          try {
+            const data = parseRoadmapData(text);
+            onLoad(text, data);
+          } catch (err) {
+            alert('Could not parse the file: ' + err.message);
+          }
+        };
+        reader.readAsText(file);
+      };
+
+      return (
+        <div className="min-h-screen flex items-center justify-center px-10" style={{ backgroundColor: colors.bg }}>
+          <div className="max-w-2xl w-full">
+            <div className="mb-10">
+              <div className="font-mono text-xs tracking-widest uppercase mb-3" style={{ color: colors.muted }}>
+                Strategic Roadmap · Data Required
+              </div>
+              <h1 className="font-display" style={{ fontSize: 48, color: colors.ink, fontWeight: 400, letterSpacing: '-0.02em', lineHeight: 1.1 }}>
+                Observability <span style={{ fontStyle: 'italic', fontWeight: 300 }}>&</span> Monitoring
+              </h1>
+              <p className="font-body mt-4" style={{ fontSize: 15, color: colors.inkSoft, maxWidth: 540 }}>
+                The dashboard reads its content from <span className="font-mono" style={{ fontSize: 13 }}>roadmap-data.md</span>.
+                Drop the file here or pick it from your computer to get started.
+              </p>
+            </div>
+
+            <div
+              className={`drop-zone ${dragOver ? 'dragover' : ''}`}
+              style={{ padding: 48, borderRadius: 6, backgroundColor: colors.surface, textAlign: 'center' }}
+              onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragOver(false);
+                const file = e.dataTransfer.files[0];
+                if (file) handleFile(file);
+              }}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <div style={{ display: 'inline-flex', padding: 14, borderRadius: '50%', backgroundColor: '#F5F2EB', color: colors.ink }}>
+                <FileText size={28} strokeWidth={1.5} />
+              </div>
+              <div className="font-display mt-5" style={{ fontSize: 22, color: colors.ink, fontWeight: 500 }}>
+                Drop <span style={{ fontStyle: 'italic' }}>roadmap-data.md</span> here
+              </div>
+              <div className="font-mono mt-2" style={{ fontSize: 11, color: colors.muted, letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+                or click to choose a file
+              </div>
+              <input ref={fileInputRef} type="file" accept=".md,.markdown,.txt"
+                     style={{ display: 'none' }}
+                     onChange={(e) => handleFile(e.target.files[0])} />
+            </div>
+
+            {fetchError && (
+              <div className="mt-6 p-4 font-body" style={{
+                fontSize: 12, color: colors.muted,
+                backgroundColor: '#F5F2EB', borderRadius: 4
+              }}>
+                <span className="font-mono" style={{ fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', fontWeight: 600, color: colors.inkSoft }}>
+                  Tip
+                </span>
+                <span style={{ marginLeft: 12 }}>
+                  When opened directly via <span className="font-mono">file://</span>, browsers can't auto-load local files.
+                  To skip this picker, run <span className="font-mono" style={{ backgroundColor: colors.surface, padding: '2px 6px', borderRadius: 3 }}>python3 -m http.server</span> in this folder and visit <span className="font-mono">http://localhost:8000</span>.
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    };
+
+    // ====================================================================
+    // HEADER
+    // ====================================================================
+
+    const Header = ({ view, setView, onReload, dataInfo }) => {
+      const tabs = [
+        { id: 'timeline', label: 'Timeline', icon: Calendar },
+        { id: 'dependencies', label: 'Dependencies', icon: GitBranch },
+        { id: 'value', label: 'Value Matrix', icon: Grid3x3 }
+      ];
+
+      const { tasks, milestones } = useContext(DataContext);
+
+      return (
+        <div style={{ borderBottom: `1px solid ${colors.border}` }} className="bg-white">
+          <div className="px-10 pt-10 pb-8">
+            <div className="flex items-baseline justify-between mb-1">
+              <div className="font-mono text-xs tracking-widest uppercase" style={{ color: colors.muted }}>
+                01 / Strategic Roadmap
+              </div>
+              <div className="flex items-center gap-4">
+                <button onClick={onReload}
+                        className="flex items-center gap-2 font-mono"
+                        title="Reload data from roadmap-data.md"
+                        style={{
+                          fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase',
+                          color: colors.muted, background: 'transparent', border: 'none',
+                          cursor: 'pointer', padding: '4px 8px'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.color = colors.ink}
+                        onMouseLeave={(e) => e.currentTarget.style.color = colors.muted}>
+                  <RefreshCw size={11} strokeWidth={1.75} />
+                  Reload data
+                </button>
+                <div className="font-mono text-xs tracking-widest uppercase" style={{ color: colors.muted }}>
+                  Q2 2026 — DRAFT
+                </div>
+              </div>
+            </div>
+            <h1 className="font-display text-6xl leading-none mt-3" style={{ color: colors.ink, fontWeight: 400, letterSpacing: '-0.02em' }}>
+              Observability <span style={{ fontStyle: 'italic', fontWeight: 300 }}>&</span> Monitoring
+            </h1>
+            <div className="flex items-center justify-between mt-4">
+              <p className="font-body text-base max-w-2xl" style={{ color: colors.inkSoft }}>
+                A unified roadmap for the next twelve months. {Object.keys(milestones).length} end-state milestones, {tasks.length} tasks,
+                sequenced by dependency and value to four stakeholder groups.
+              </p>
+              <div className="font-mono text-xs" style={{ color: colors.muted }}>
+                {tasks.length} tasks · {Object.keys(milestones).length} milestones · 12 months
+              </div>
+            </div>
+          </div>
+
+          <div className="px-10 flex gap-0" style={{ borderTop: `1px solid ${colors.border}` }}>
+            {tabs.map(tab => {
+              const Icon = tab.icon;
+              const active = view === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setView(tab.id)}
+                  className="flex items-center gap-2.5 px-5 py-4 font-mono text-xs uppercase tracking-widest transition-all"
+                  style={{
+                    color: active ? colors.ink : colors.muted,
+                    background: 'transparent',
+                    border: 'none',
+                    borderBottomWidth: '2px',
+                    borderBottomStyle: 'solid',
+                    borderBottomColor: active ? colors.ink : 'transparent',
+                    marginBottom: '-1px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <Icon size={14} strokeWidth={1.75} />
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      );
+    };
+
+    // ====================================================================
+    // MILESTONE LEGEND
+    // ====================================================================
+
+    const MilestoneLegend = () => {
+      const { milestones } = useContext(DataContext);
+      const entries = Object.entries(milestones);
+      return (
+        <div className="flex items-stretch gap-0 px-10 py-6 bg-white" style={{ borderBottom: `1px solid ${colors.border}` }}>
+          {entries.map(([key, m], i) => {
+            const Icon = m.icon;
+            return (
+              <div key={key} className="flex-1 flex items-start gap-3" style={{
+                paddingLeft: i === 0 ? 0 : '20px',
+                paddingRight: i === entries.length - 1 ? 0 : '20px',
+                borderRight: i < entries.length - 1 ? `1px solid ${colors.border}` : 'none'
+              }}>
+                <div className="flex items-center justify-center mt-0.5" style={{
+                  width: 28, height: 28, borderRadius: 4,
+                  backgroundColor: m.light, color: m.color, flexShrink: 0
+                }}>
+                  <Icon size={14} strokeWidth={2} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-baseline gap-2">
+                    <span className="font-mono text-xs font-semibold" style={{ color: m.color }}>{key}</span>
+                    <span className="font-display text-base" style={{ color: colors.ink, fontWeight: 500 }}>{m.name}</span>
+                  </div>
+                  <p className="font-body text-xs mt-0.5 leading-snug" style={{ color: colors.muted }}>
+                    {m.description}
+                  </p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      );
+    };
+
+    // ====================================================================
+    // TIMELINE VIEW
+    // ====================================================================
+
+    const TimelineView = ({ onSelectTask, selectedTaskId }) => {
+      const { milestones, tasks, phases, horizonOutcomes } = useContext(DataContext);
+      const [horizon, setHorizon] = useState('quarter');
+
+      const horizonConfig = {
+        quarter: { totalWeeks: 12, weekWidth: 64, label: '3 months', showWeekLabels: true,  monthLabelStyle: 'full' },
+        half:    { totalWeeks: 24, weekWidth: 38, label: '6 months', showWeekLabels: false, monthLabelStyle: 'short' },
+        year:    { totalWeeks: 48, weekWidth: 24, label: '12 months',showWeekLabels: false, monthLabelStyle: 'short' }
+      };
+      const config = horizonConfig[horizon];
+      const { totalWeeks, weekWidth, showWeekLabels, monthLabelStyle } = config;
+
+      const labelWidth = 280;
+      const rowHeight = 36;
+      const phaseHeaderHeight = 26;
+      const outcomeRowHeight = 78;
+
+      const phaseTasks = useMemo(() => {
+        const grouped = {};
+        phases.forEach(p => grouped[p] = []);
+        tasks.forEach(t => {
+          if (grouped[t.phase]) grouped[t.phase].push(t);
+        });
+        return grouped;
+      }, [tasks, phases]);
+
+      const layout = useMemo(() => {
+        let yOffset = 50;
+        const taskPositions = {};
+        const phaseHeaders = [];
+
+        phases.forEach((phase) => {
+          if (!phaseTasks[phase] || phaseTasks[phase].length === 0) return;
+          phaseHeaders.push({ phase, y: yOffset });
+          yOffset += phaseHeaderHeight;
+
+          phaseTasks[phase].forEach((task) => {
+            taskPositions[task.id] = yOffset;
+            yOffset += rowHeight;
+          });
+        });
+
+        return { taskPositions, phaseHeaders, tasksEndY: yOffset };
+      }, [phaseTasks, phases]);
+
+      const { taskPositions, phaseHeaders, tasksEndY } = layout;
+
+      const showOutcomes = horizon !== 'quarter';
+      const outcomeHeaderY = tasksEndY + 16;
+      const outcomeStartY = outcomeHeaderY + 24;
+      const milestoneEntries = Object.entries(milestones);
+
+      const chartHeight = showOutcomes
+        ? outcomeStartY + milestoneEntries.length * outcomeRowHeight + 24
+        : tasksEndY + 24;
+      const chartWidth = labelWidth + totalWeeks * weekWidth;
+
+      const sixMonthWeek = 24;
+      const twelveMonthWeek = 48;
+
+      return (
+        <div className="fade-in p-10">
+          <div className="flex items-center justify-between mb-4">
+            <div className="font-mono" style={{ color: colors.muted, fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+              Time Horizon
+            </div>
+            <div className="flex" style={{ border: `1px solid ${colors.border}`, borderRadius: 4, overflow: 'hidden', backgroundColor: colors.surface }}>
+              {Object.entries(horizonConfig).map(([id, c], i) => (
+                <button
+                  key={id}
+                  onClick={() => setHorizon(id)}
+                  className="font-mono"
+                  style={{
+                    padding: '8px 18px',
+                    fontSize: 10,
+                    letterSpacing: '0.1em',
+                    textTransform: 'uppercase',
+                    color: horizon === id ? '#FFFFFF' : colors.inkSoft,
+                    backgroundColor: horizon === id ? colors.ink : 'transparent',
+                    border: 'none',
+                    borderLeft: i > 0 ? `1px solid ${colors.border}` : 'none',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s',
+                    fontWeight: horizon === id ? 600 : 500
+                  }}
+                >
+                  {c.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="bg-white" style={{ border: `1px solid ${colors.border}` }}>
+            <div className="overflow-x-auto scrollable-y">
+              <svg width={chartWidth} height={chartHeight} style={{ display: 'block' }}>
+                <g>
+                  <rect x={0} y={0} width={chartWidth} height={50} fill={colors.surface} />
+                  <line x1={labelWidth} y1={50} x2={chartWidth} y2={50} stroke={colors.border} strokeWidth={1} />
+                  <line x1={labelWidth} y1={0} x2={labelWidth} y2={chartHeight} stroke={colors.border} strokeWidth={1} />
+
+                  <text x={20} y={32} className="font-mono" fontSize={10}
+                        fill={colors.muted} letterSpacing="0.12em" fontWeight={500}>
+                    TASK
+                  </text>
+
+                  {Array.from({ length: totalWeeks }, (_, i) => i + 1).map(week => {
+                    const x = labelWidth + (week - 1) * weekWidth;
+                    const isMonthBoundary = week % 4 === 1;
+                    const monthNum = Math.ceil(week / 4);
+
+                    return (
+                      <g key={week}>
+                        <line x1={x + weekWidth} y1={0} x2={x + weekWidth} y2={chartHeight}
+                              stroke={colors.border} strokeWidth={week % 4 === 0 ? 1 : 0.5}
+                              strokeDasharray={week % 4 === 0 ? '0' : '2,2'} />
+                        {showWeekLabels && (
+                          <text x={x + weekWidth/2} y={20}
+                                className="font-mono number-tick" fontSize={9.5} fill={colors.muted}
+                                textAnchor="middle">
+                            W{week}
+                          </text>
+                        )}
+                        {isMonthBoundary && (
+                          <text x={x + 2 * weekWidth} y={showWeekLabels ? 38 : 28}
+                                className="font-mono" fontSize={monthLabelStyle === 'full' ? 9 : 11}
+                                fill={colors.ink}
+                                textAnchor="middle" fontWeight={600}
+                                letterSpacing="0.05em">
+                            {monthLabelStyle === 'full' ? `MONTH ${monthNum}` : `M${monthNum}`}
+                          </text>
+                        )}
+                      </g>
+                    );
+                  })}
+                </g>
+
+                {showOutcomes && (
+                  <g>
+                    {totalWeeks >= sixMonthWeek && (
+                      <g>
+                        <line x1={labelWidth + sixMonthWeek * weekWidth}
+                              y1={50}
+                              x2={labelWidth + sixMonthWeek * weekWidth}
+                              y2={chartHeight}
+                              stroke={colors.ink} strokeWidth={1.25}
+                              strokeDasharray="3,4" opacity={0.4} />
+                        <rect x={labelWidth + sixMonthWeek * weekWidth - 50}
+                              y={4} width={48} height={18} rx={2}
+                              fill={colors.ink} />
+                        <text x={labelWidth + sixMonthWeek * weekWidth - 26}
+                              y={16}
+                              className="font-mono" fontSize={9}
+                              fill="#FFFFFF" textAnchor="middle" fontWeight={600}>
+                          6 MO
+                        </text>
+                      </g>
+                    )}
+                    {totalWeeks >= twelveMonthWeek && (
+                      <g>
+                        <line x1={labelWidth + twelveMonthWeek * weekWidth}
+                              y1={50}
+                              x2={labelWidth + twelveMonthWeek * weekWidth}
+                              y2={chartHeight}
+                              stroke={colors.ink} strokeWidth={1.25}
+                              strokeDasharray="3,4" opacity={0.4} />
+                        <rect x={labelWidth + twelveMonthWeek * weekWidth - 52}
+                              y={4} width={50} height={18} rx={2}
+                              fill={colors.ink} />
+                        <text x={labelWidth + twelveMonthWeek * weekWidth - 27}
+                              y={16}
+                              className="font-mono" fontSize={9}
+                              fill="#FFFFFF" textAnchor="middle" fontWeight={600}>
+                          12 MO
+                        </text>
+                      </g>
+                    )}
+                  </g>
+                )}
+
+                {phaseHeaders.map(({ phase, y }) => (
+                  <g key={phase}>
+                    <rect x={0} y={y} width={chartWidth} height={phaseHeaderHeight}
+                          fill="#F5F2EB" />
+                    <line x1={0} y1={y} x2={chartWidth} y2={y}
+                          stroke={colors.border} strokeWidth={1} />
+                    <line x1={0} y1={y + phaseHeaderHeight} x2={chartWidth} y2={y + phaseHeaderHeight}
+                          stroke={colors.border} strokeWidth={0.5} />
+                    <text x={20} y={y + 17}
+                          className="font-mono" fontSize={9.5}
+                          fill={colors.ink} letterSpacing="0.13em" fontWeight={600}>
+                      {phase.toUpperCase()}
+                    </text>
+                  </g>
+                ))}
+
+                {tasks.map((task) => {
+                  const y = taskPositions[task.id];
+                  if (y === undefined) return null;
+                  const x = labelWidth + (task.startWeek - 1) * weekWidth;
+                  const w = (task.endWeek - task.startWeek + 1) * weekWidth - 4;
+                  const m = milestones[task.milestone];
+                  if (!m) return null;
+                  const isSelected = selectedTaskId === task.id;
+                  const showLabel = w > 50;
+                  const titleMaxLen = horizon === 'quarter' ? 30 : 32;
+
+                  return (
+                    <g key={task.id} className="gantt-bar" style={{ cursor: 'pointer' }}
+                       onClick={() => onSelectTask(task)}>
+                      <text x={32} y={y + 22} className="font-mono" fontSize={9}
+                            fill={colors.muted} fontWeight={500}>
+                        {task.id}
+                      </text>
+                      <text x={62} y={y + 22} className="font-body" fontSize={11.5}
+                            fill={isSelected ? colors.ink : colors.inkSoft}
+                            fontWeight={isSelected ? 600 : 400}>
+                        {task.title.length > titleMaxLen ? task.title.slice(0, titleMaxLen - 2) + '…' : task.title}
+                      </text>
+
+                      <rect x={x + 2} y={y + 8} width={w} height={20} rx={2}
+                            fill={isSelected ? m.color : m.light}
+                            stroke={m.color} strokeWidth={isSelected ? 0 : 1} />
+                      <rect x={x + 2} y={y + 8} width={3} height={20}
+                            fill={m.color} />
+
+                      {showLabel && (
+                        <text x={x + 12} y={y + 22} className="font-mono"
+                              fontSize={9.5} fontWeight={600}
+                              fill={isSelected ? '#FFFFFF' : m.color}>
+                          {task.milestone}
+                        </text>
+                      )}
+
+                      <rect x={0} y={y} width={chartWidth} height={rowHeight}
+                            fill="transparent" />
+                    </g>
+                  );
+                })}
+
+                {showOutcomes && (
+                  <g>
+                    <rect x={0} y={outcomeHeaderY} width={chartWidth} height={24}
+                          fill={colors.ink} />
+                    <text x={20} y={outcomeHeaderY + 16}
+                          className="font-mono" fontSize={9.5}
+                          fill="#FAFAF7" letterSpacing="0.15em" fontWeight={600}>
+                      HORIZON OUTCOMES — DELIVERED FROM Q1 GROUNDWORK
+                    </text>
+
+                    {milestoneEntries.map(([key, m], i) => {
+                      const y = outcomeStartY + i * outcomeRowHeight;
+
+                      const sixStart = labelWidth + 12 * weekWidth + 4;
+                      const sixEnd = labelWidth + sixMonthWeek * weekWidth - 4;
+                      const sixWidth = Math.max(0, sixEnd - sixStart);
+
+                      const twelveStart = labelWidth + sixMonthWeek * weekWidth + 4;
+                      const twelveEnd = labelWidth + twelveMonthWeek * weekWidth - 4;
+                      const twelveWidth = Math.max(0, twelveEnd - twelveStart);
+
+                      const ho = horizonOutcomes[key] || { sixMonth: [], twelveMonth: [] };
+                      const sixOutcomes = ho.sixMonth;
+                      const twelveOutcomes = ho.twelveMonth;
+                      const showTwelve = horizon === 'year';
+                      const showSix = horizon !== 'quarter' && totalWeeks >= sixMonthWeek;
+
+                      return (
+                        <g key={key}>
+                          <rect x={0} y={y} width={chartWidth} height={outcomeRowHeight}
+                                fill={i % 2 === 0 ? '#FFFFFF' : '#FAFAF7'} />
+                          <line x1={0} y1={y + outcomeRowHeight} x2={chartWidth} y2={y + outcomeRowHeight}
+                                stroke={colors.border} strokeWidth={0.5} />
+
+                          <rect x={4} y={y + 14} width={3} height={outcomeRowHeight - 28}
+                                fill={m.color} />
+                          <text x={20} y={y + 26} className="font-mono"
+                                fontSize={11} fill={m.color} fontWeight={600}>
+                            {key}
+                          </text>
+                          <text x={20} y={y + 44} className="font-display"
+                                fontSize={13} fill={colors.ink} fontWeight={500}>
+                            {m.name}
+                          </text>
+                          <text x={20} y={y + 60} className="font-mono"
+                                fontSize={9} fill={colors.muted} letterSpacing="0.05em">
+                            HORIZON OUTCOMES
+                          </text>
+
+                          {showSix && sixWidth > 20 && (
+                            <g>
+                              <rect x={sixStart} y={y + 8} width={sixWidth} height={outcomeRowHeight - 16}
+                                    fill={m.color} fillOpacity={0.06}
+                                    stroke={m.color} strokeOpacity={0.5} strokeWidth={1}
+                                    strokeDasharray="2,3" rx={3} />
+                              {sixOutcomes.slice(0, 3).map((outcome, idx) => (
+                                <text key={idx}
+                                      x={sixStart + 10}
+                                      y={y + 22 + idx * 16}
+                                      className="font-body"
+                                      fontSize={10}
+                                      fill={colors.inkSoft}>
+                                  · {outcome}
+                                </text>
+                              ))}
+                            </g>
+                          )}
+
+                          {showTwelve && twelveWidth > 20 && (
+                            <g>
+                              <rect x={twelveStart} y={y + 8} width={twelveWidth} height={outcomeRowHeight - 16}
+                                    fill={m.color} fillOpacity={0.1}
+                                    stroke={m.color} strokeOpacity={0.6} strokeWidth={1}
+                                    strokeDasharray="2,3" rx={3} />
+                              {twelveOutcomes.slice(0, 3).map((outcome, idx) => (
+                                <text key={idx}
+                                      x={twelveStart + 10}
+                                      y={y + 22 + idx * 16}
+                                      className="font-body"
+                                      fontSize={10}
+                                      fill={colors.inkSoft}>
+                                  · {outcome}
+                                </text>
+                              ))}
+                            </g>
+                          )}
+                        </g>
+                      );
+                    })}
+                  </g>
+                )}
+              </svg>
+            </div>
+          </div>
+
+          <div className="mt-6 flex items-center justify-between font-mono text-xs" style={{ color: colors.muted }}>
+            <span>↗ Click any task for details and dependencies</span>
+            <span>{horizon === 'quarter'
+              ? 'Bar position = scheduled weeks · Color = milestone'
+              : 'Q1 detail (tasks) leads to outcomes at 6 and 12 months'}</span>
+          </div>
+        </div>
+      );
+    };
+
+    // ====================================================================
+    // DEPENDENCY GRAPH VIEW
+    // ====================================================================
+
+    const DependencyGraphView = ({ onSelectTask, selectedTaskId }) => {
+      const { milestones, tasks } = useContext(DataContext);
+      const svgRef = useRef(null);
+      const [hoveredId, setHoveredId] = useState(null);
+
+      useEffect(() => {
+        if (!svgRef.current) return;
+
+        const svg = d3.select(svgRef.current);
+        svg.selectAll('*').remove();
+
+        const width = 1100;
+        const height = 720;
+
+        const nodes = tasks.map(t => ({ ...t, id: t.id }));
+        const links = [];
+        tasks.forEach(t => {
+          t.deps.forEach(dep => {
+            if (tasks.find(x => x.id === dep)) {
+              links.push({ source: dep, target: t.id });
+            }
+          });
+        });
+
+        nodes.forEach(n => {
+          const weekMid = (n.startWeek + n.endWeek) / 2;
+          n.targetX = ((weekMid - 1) / 11) * (width - 100) + 50;
+        });
+
+        const simulation = d3.forceSimulation(nodes)
+          .force('link', d3.forceLink(links).id(d => d.id).distance(80).strength(0.3))
+          .force('charge', d3.forceManyBody().strength(-200))
+          .force('x', d3.forceX(d => n => n.targetX).strength(1))
+          .force('y', d3.forceY(height / 2).strength(0.05))
+          .force('collide', d3.forceCollide(28))
+          .stop();
+        // Fix the force's accessor:
+        simulation.force('x', d3.forceX(d => d.targetX).strength(1));
+
+        for (let i = 0; i < 300; i++) simulation.tick();
+
+        const defs = svg.append('defs');
+        Object.entries(milestones).forEach(([key, m]) => {
+          defs.append('marker')
+            .attr('id', `arrow-${key}`)
+            .attr('viewBox', '0 -5 10 10')
+            .attr('refX', 18).attr('refY', 0)
+            .attr('markerWidth', 5).attr('markerHeight', 5)
+            .attr('orient', 'auto')
+            .append('path').attr('d', 'M0,-4L8,0L0,4').attr('fill', m.color);
+        });
+
+        defs.append('marker')
+          .attr('id', 'arrow-default')
+          .attr('viewBox', '0 -5 10 10')
+          .attr('refX', 18).attr('refY', 0)
+          .attr('markerWidth', 5).attr('markerHeight', 5)
+          .attr('orient', 'auto')
+          .append('path').attr('d', 'M0,-4L8,0L0,4').attr('fill', '#C4C0B8');
+
+        const g = svg.append('g');
+
+        for (let w = 1; w <= 12; w++) {
+          const x = ((w - 1) / 11) * (width - 100) + 50;
+          g.append('line')
+            .attr('x1', x).attr('x2', x)
+            .attr('y1', 30).attr('y2', height - 20)
+            .attr('stroke', colors.border)
+            .attr('stroke-width', w % 4 === 0 ? 1 : 0.5)
+            .attr('stroke-dasharray', w % 4 === 0 ? '0' : '2,3');
+          g.append('text')
+            .attr('x', x).attr('y', 20)
+            .attr('text-anchor', 'middle')
+            .attr('font-family', 'IBM Plex Mono, monospace')
+            .attr('font-size', 10)
+            .attr('fill', colors.muted)
+            .text(`W${w}`);
+        }
+
+        g.append('g').selectAll('path')
+          .data(links)
+          .enter().append('path')
+          .attr('d', d => {
+            const dx = d.target.x - d.source.x;
+            const dy = d.target.y - d.source.y;
+            const dr = Math.sqrt(dx * dx + dy * dy) * 1.3;
+            return `M${d.source.x},${d.source.y}A${dr},${dr} 0 0,1 ${d.target.x},${d.target.y}`;
+          })
+          .attr('fill', 'none')
+          .attr('stroke', '#C4C0B8')
+          .attr('stroke-width', 1)
+          .attr('opacity', 0.55)
+          .attr('marker-end', 'url(#arrow-default)');
+
+        const nodeG = g.append('g').selectAll('g')
+          .data(nodes)
+          .enter().append('g')
+          .attr('transform', d => `translate(${d.x},${d.y})`)
+          .style('cursor', 'pointer')
+          .on('mouseenter', (e, d) => setHoveredId(d.id))
+          .on('mouseleave', () => setHoveredId(null))
+          .on('click', (e, d) => onSelectTask(d));
+
+        nodeG.append('circle')
+          .attr('r', 18)
+          .attr('fill', d => milestones[d.milestone]?.light || '#EEE')
+          .attr('stroke', d => milestones[d.milestone]?.color || '#888')
+          .attr('stroke-width', 1.5);
+
+        nodeG.append('text')
+          .attr('text-anchor', 'middle')
+          .attr('dy', '.35em')
+          .attr('font-family', 'IBM Plex Mono, monospace')
+          .attr('font-size', 10)
+          .attr('font-weight', 600)
+          .attr('fill', d => milestones[d.milestone]?.color || '#000')
+          .text(d => d.id);
+      }, [onSelectTask, tasks, milestones]);
+
+      useEffect(() => {
+        if (!svgRef.current) return;
+        const svg = d3.select(svgRef.current);
+        const activeId = hoveredId || selectedTaskId;
+
+        if (!activeId) {
+          svg.selectAll('circle').attr('opacity', 1).attr('stroke-width', 1.5);
+          svg.selectAll('text').attr('opacity', 1);
+          svg.selectAll('path').attr('opacity', 0.55).attr('marker-end', 'url(#arrow-default)').attr('stroke', '#C4C0B8').attr('stroke-width', 1);
+          return;
+        }
+
+        const task = tasks.find(t => t.id === activeId);
+        if (!task) return;
+
+        const connectedIds = new Set([activeId]);
+        task.deps.forEach(d => connectedIds.add(d));
+        tasks.forEach(t => {
+          if (t.deps.includes(activeId)) connectedIds.add(t.id);
+        });
+
+        svg.selectAll('circle')
+          .attr('opacity', function(d) { return connectedIds.has(d.id) ? 1 : 0.2; })
+          .attr('stroke-width', function(d) { return d.id === activeId ? 3 : 1.5; });
+
+        svg.selectAll('text')
+          .attr('opacity', function(d) {
+            if (!d || !d.id) return 1;
+            return connectedIds.has(d.id) ? 1 : 0.3;
+          });
+
+        svg.selectAll('path')
+          .attr('opacity', function(d) {
+            if (!d.source) return 0.55;
+            const involved = (d.source.id === activeId || d.target.id === activeId);
+            return involved ? 1 : 0.05;
+          })
+          .attr('stroke', function(d) {
+            if (!d.source) return '#C4C0B8';
+            const involved = (d.source.id === activeId || d.target.id === activeId);
+            if (!involved) return '#C4C0B8';
+            const t = tasks.find(x => x.id === d.target.id);
+            return t && milestones[t.milestone] ? milestones[t.milestone].color : '#888';
+          })
+          .attr('stroke-width', function(d) {
+            if (!d.source) return 1;
+            const involved = (d.source.id === activeId || d.target.id === activeId);
+            return involved ? 1.5 : 1;
+          })
+          .attr('marker-end', function(d) {
+            if (!d.source) return 'url(#arrow-default)';
+            const involved = (d.source.id === activeId || d.target.id === activeId);
+            if (!involved) return 'url(#arrow-default)';
+            const t = tasks.find(x => x.id === d.target.id);
+            return t ? `url(#arrow-${t.milestone})` : 'url(#arrow-default)';
+          });
+      }, [hoveredId, selectedTaskId, tasks, milestones]);
+
+      return (
+        <div className="fade-in p-10">
+          <div className="bg-white grid-bg" style={{ border: `1px solid ${colors.border}` }}>
+            <svg ref={svgRef} width={1100} height={720} style={{ display: 'block', margin: '0 auto' }} />
+          </div>
+          <div className="mt-6 flex items-center justify-between font-mono text-xs" style={{ color: colors.muted }}>
+            <span>↗ Hover a node to see its dependencies and dependents · Click for details</span>
+            <span>Horizontal position = scheduled week · Lines = "must complete before"</span>
+          </div>
+        </div>
+      );
+    };
+
+    // ====================================================================
+    // VALUE MATRIX VIEW
+    // ====================================================================
+
+    const ValueMatrixView = ({ onSelectTask, selectedTaskId }) => {
+      const { milestones, tasks, phases } = useContext(DataContext);
+      const cellSize = 56;
+      const labelWidth = 320;
+      const rowHeight = 32;
+
+      const totals = stakeholders.reduce((acc, s) => {
+        acc[s.id] = tasks.reduce((sum, t) => sum + t.value[s.id], 0);
+        return acc;
+      }, {});
+      const maxTotal = Math.max(...Object.values(totals), 1);
+
+      const valueColor = (v) => {
+        const intensity = v / 5;
+        const lightness = 96 - intensity * 60;
+        return `hsl(220, 25%, ${lightness}%)`;
+      };
+
+      const valueTextColor = (v) => v >= 3 ? '#FFFFFF' : colors.ink;
+
+      const phaseTasks = useMemo(() => {
+        const grouped = {};
+        phases.forEach(p => grouped[p] = []);
+        tasks.forEach(t => {
+          if (grouped[t.phase]) grouped[t.phase].push(t);
+        });
+        return grouped;
+      }, [tasks, phases]);
+
+      return (
+        <div className="fade-in p-10">
+          <div className="bg-white" style={{ border: `1px solid ${colors.border}` }}>
+            <div className="overflow-x-auto">
+              <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+                <thead>
+                  <tr>
+                    <th style={{
+                      width: labelWidth, textAlign: 'left', padding: '20px 24px',
+                      borderBottom: `1px solid ${colors.border}`,
+                      fontFamily: 'IBM Plex Mono', fontSize: 10, fontWeight: 500,
+                      letterSpacing: '0.1em', color: colors.muted, textTransform: 'uppercase'
+                    }}>
+                      Task
+                    </th>
+                    {stakeholders.map(s => (
+                      <th key={s.id} style={{
+                        width: cellSize + 24, textAlign: 'center', padding: '16px 12px',
+                        borderBottom: `1px solid ${colors.border}`,
+                        borderLeft: `1px solid ${colors.border}`
+                      }}>
+                        <div className="font-display" style={{ fontSize: 18, color: colors.ink, fontWeight: 500 }}>
+                          {s.label}
+                        </div>
+                        <div className="font-mono mt-1" style={{ fontSize: 9, color: colors.muted, letterSpacing: '0.05em' }}>
+                          {s.sublabel}
+                        </div>
+                      </th>
+                    ))}
+                    <th style={{
+                      width: 60, textAlign: 'center', padding: '20px 12px',
+                      borderBottom: `1px solid ${colors.border}`,
+                      borderLeft: `2px solid ${colors.border}`,
+                      fontFamily: 'IBM Plex Mono', fontSize: 10, fontWeight: 500,
+                      letterSpacing: '0.1em', color: colors.muted, textTransform: 'uppercase'
+                    }}>
+                      Total
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {phases.map((phase, pi) => {
+                    if (!phaseTasks[phase] || phaseTasks[phase].length === 0) return null;
+                    return (
+                      <Fragment key={phase}>
+                        <tr>
+                          <td colSpan={stakeholders.length + 2} style={{
+                            padding: '14px 24px 6px',
+                            borderTop: pi > 0 ? `1px solid ${colors.border}` : 'none',
+                            backgroundColor: '#FAFAF7'
+                          }}>
+                            <span className="font-mono" style={{
+                              fontSize: 10, fontWeight: 500, color: colors.muted,
+                              letterSpacing: '0.1em', textTransform: 'uppercase'
+                            }}>
+                              {phase}
+                            </span>
+                          </td>
+                        </tr>
+                        {phaseTasks[phase].map(task => {
+                          const m = milestones[task.milestone];
+                          if (!m) return null;
+                          const total = stakeholders.reduce((s, st) => s + task.value[st.id], 0);
+                          const isSelected = selectedTaskId === task.id;
+                          return (
+                            <tr key={task.id} onClick={() => onSelectTask(task)}
+                                className="heatmap-cell"
+                                style={{
+                                  cursor: 'pointer',
+                                  backgroundColor: isSelected ? '#F5F2EB' : 'transparent'
+                                }}>
+                              <td style={{ padding: '8px 24px', borderTop: `1px solid ${colors.border}` }}>
+                                <div className="flex items-center gap-3">
+                                  <div style={{
+                                    width: 4, height: 24, borderRadius: 1,
+                                    backgroundColor: m.color, flexShrink: 0
+                                  }} />
+                                  <span className="font-mono" style={{ fontSize: 10, color: colors.muted, fontWeight: 500, width: 28 }}>
+                                    {task.id}
+                                  </span>
+                                  <span className="font-body" style={{ fontSize: 13, color: colors.ink, fontWeight: isSelected ? 600 : 400 }}>
+                                    {task.title}
+                                  </span>
+                                </div>
+                              </td>
+                              {stakeholders.map(s => {
+                                const v = task.value[s.id];
+                                return (
+                                  <td key={s.id} style={{
+                                    padding: '4px',
+                                    borderTop: `1px solid ${colors.border}`,
+                                    borderLeft: `1px solid ${colors.border}`,
+                                    textAlign: 'center'
+                                  }}>
+                                    <div className="heatmap-cell" style={{
+                                      margin: '0 auto',
+                                      width: cellSize - 4, height: rowHeight - 4,
+                                      borderRadius: 3,
+                                      backgroundColor: valueColor(v),
+                                      color: valueTextColor(v),
+                                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                      fontFamily: 'IBM Plex Mono', fontSize: 12, fontWeight: 500
+                                    }}>
+                                      {v}
+                                    </div>
+                                  </td>
+                                );
+                              })}
+                              <td style={{
+                                padding: '8px 12px',
+                                borderTop: `1px solid ${colors.border}`,
+                                borderLeft: `2px solid ${colors.border}`,
+                                textAlign: 'center'
+                              }}>
+                                <span className="font-mono" style={{ fontSize: 12, color: colors.ink, fontWeight: 600 }}>
+                                  {total}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </Fragment>
+                    );
+                  })}
+                  <tr style={{ backgroundColor: '#0F1419' }}>
+                    <td style={{ padding: '14px 24px', borderTop: `2px solid ${colors.ink}` }}>
+                      <span className="font-mono" style={{
+                        fontSize: 10, color: '#FAFAF7', fontWeight: 500,
+                        letterSpacing: '0.1em', textTransform: 'uppercase'
+                      }}>
+                        Total Value Per Stakeholder
+                      </span>
+                    </td>
+                    {stakeholders.map(s => (
+                      <td key={s.id} style={{
+                        padding: '14px 12px', borderTop: `2px solid ${colors.ink}`,
+                        borderLeft: `1px solid #2A3441`, textAlign: 'center'
+                      }}>
+                        <div className="font-mono" style={{ fontSize: 18, color: '#FAFAF7', fontWeight: 600 }}>
+                          {totals[s.id]}
+                        </div>
+                        <div style={{
+                          marginTop: 6, height: 3, borderRadius: 2,
+                          backgroundColor: '#2A3441', overflow: 'hidden'
+                        }}>
+                          <div style={{
+                            height: '100%',
+                            width: `${(totals[s.id] / maxTotal) * 100}%`,
+                            backgroundColor: '#FAFAF7'
+                          }} />
+                        </div>
+                      </td>
+                    ))}
+                    <td style={{
+                      padding: '14px 12px', borderTop: `2px solid ${colors.ink}`,
+                      borderLeft: `2px solid #2A3441`, textAlign: 'center'
+                    }}>
+                      <span className="font-mono" style={{ fontSize: 18, color: '#FAFAF7', fontWeight: 600 }}>
+                        {Object.values(totals).reduce((a, b) => a + b, 0)}
+                      </span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="mt-6 flex items-center justify-between">
+            <div className="font-mono text-xs" style={{ color: colors.muted }}>
+              ↗ Click a row for task details · Cell value = direct benefit (0–5)
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-xs" style={{ color: colors.muted }}>Low</span>
+              {[1, 2, 3, 4, 5].map(v => (
+                <div key={v} className="flex flex-col items-center gap-1">
+                  <div style={{
+                    width: 24, height: 16, borderRadius: 2,
+                    backgroundColor: valueColor(v)
+                  }} />
+                  <span className="font-mono" style={{ fontSize: 9, color: colors.muted }}>{v}</span>
+                </div>
+              ))}
+              <span className="font-mono text-xs" style={{ color: colors.muted }}>High</span>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // ====================================================================
+    // TASK DETAIL PANEL
+    // ====================================================================
+
+    const TaskDetailPanel = ({ task, onClose }) => {
+      const { milestones, tasks } = useContext(DataContext);
+      if (!task) return null;
+      const m = milestones[task.milestone];
+      if (!m) return null;
+      const dependents = tasks.filter(t => t.deps.includes(task.id));
+      const dependencies = task.deps.map(id => tasks.find(t => t.id === id)).filter(Boolean);
+      const stakeholderValues = stakeholders.map(s => ({ ...s, value: task.value[s.id] }));
+      const total = stakeholderValues.reduce((s, sv) => s + sv.value, 0);
+
+      return (
+        <div className="fixed inset-y-0 right-0 z-50 panel-enter" style={{
+          width: 460,
+          backgroundColor: colors.bg,
+          borderLeft: `1px solid ${colors.borderStrong}`,
+          boxShadow: '-12px 0 30px rgba(0,0,0,0.05)'
+        }}>
+          <div className="h-full flex flex-col">
+            <div style={{ padding: '24px 28px 20px', borderBottom: `1px solid ${colors.border}` }}>
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-3">
+                  <div style={{
+                    padding: '6px 10px', borderRadius: 3,
+                    backgroundColor: m.light, color: m.color,
+                    fontFamily: 'IBM Plex Mono', fontSize: 11, fontWeight: 600,
+                    letterSpacing: '0.05em'
+                  }}>
+                    {task.milestone} · {m.name}
+                  </div>
+                </div>
+                <button onClick={onClose}
+                        style={{
+                          padding: 4, borderRadius: 3, border: 'none',
+                          background: 'transparent', cursor: 'pointer',
+                          color: colors.inkSoft
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = '#E8E5DE'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
+                  <X size={18} strokeWidth={1.75} />
+                </button>
+              </div>
+
+              <div className="mt-4 flex items-baseline gap-3">
+                <span className="font-mono" style={{ fontSize: 13, color: colors.muted, fontWeight: 500 }}>
+                  {task.id}
+                </span>
+                <h2 className="font-display" style={{
+                  fontSize: 26, color: colors.ink, fontWeight: 500, letterSpacing: '-0.01em', lineHeight: 1.15
+                }}>
+                  {task.title}
+                </h2>
+              </div>
+
+              <div className="mt-3 flex items-center gap-4 font-mono" style={{ fontSize: 10, color: colors.muted }}>
+                <span style={{ textTransform: 'uppercase', letterSpacing: '0.1em' }}>{task.phase}</span>
+                <span>·</span>
+                <span>WEEK {task.startWeek}–{task.endWeek}</span>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto scrollable-y" style={{ padding: '24px 28px' }}>
+              <div className="mb-6">
+                <div className="font-mono mb-2" style={{
+                  fontSize: 10, color: colors.muted, letterSpacing: '0.1em', textTransform: 'uppercase'
+                }}>
+                  Description
+                </div>
+                <p className="font-body" style={{ fontSize: 14, color: colors.inkSoft, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+                  {task.description}
+                </p>
+              </div>
+
+              <div className="mb-6 p-4" style={{
+                backgroundColor: colors.surface,
+                border: `1px solid ${colors.border}`,
+                borderLeft: `3px solid ${m.color}`
+              }}>
+                <div className="font-mono mb-1" style={{
+                  fontSize: 10, color: m.color, letterSpacing: '0.1em', textTransform: 'uppercase', fontWeight: 600
+                }}>
+                  Deliverable
+                </div>
+                <p className="font-body" style={{ fontSize: 13.5, color: colors.ink, fontStyle: 'italic' }}>
+                  {task.deliverable}
+                </p>
+              </div>
+
+              <div className="mb-6">
+                <div className="flex items-baseline justify-between mb-3">
+                  <div className="font-mono" style={{
+                    fontSize: 10, color: colors.muted, letterSpacing: '0.1em', textTransform: 'uppercase'
+                  }}>
+                    Stakeholder Value
+                  </div>
+                  <div className="font-mono" style={{ fontSize: 11, color: colors.muted }}>
+                    Total: <span style={{ color: colors.ink, fontWeight: 600 }}>{total}/20</span>
+                  </div>
+                </div>
+                <div className="space-y-2.5">
+                  {stakeholderValues.map(s => (
+                    <div key={s.id} className="flex items-center gap-3">
+                      <div className="font-body" style={{ fontSize: 12.5, color: colors.ink, width: 100, fontWeight: 500 }}>
+                        {s.label}
+                      </div>
+                      <div className="flex-1 flex gap-1">
+                        {[1, 2, 3, 4, 5].map(n => (
+                          <div key={n} style={{
+                            flex: 1, height: 12, borderRadius: 1,
+                            backgroundColor: n <= s.value ? colors.ink : colors.border
+                          }} />
+                        ))}
+                      </div>
+                      <div className="font-mono" style={{ fontSize: 11, color: colors.ink, width: 24, textAlign: 'right', fontWeight: 600 }}>
+                        {s.value}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mb-6">
+                <div className="font-mono mb-3" style={{
+                  fontSize: 10, color: colors.muted, letterSpacing: '0.1em', textTransform: 'uppercase'
+                }}>
+                  Depends On ({dependencies.length})
+                </div>
+                {dependencies.length === 0 ? (
+                  <p className="font-body" style={{ fontSize: 12, color: colors.muted, fontStyle: 'italic' }}>
+                    No dependencies. Can start immediately.
+                  </p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {dependencies.map(d => {
+                      const dm = milestones[d.milestone];
+                      return (
+                        <div key={d.id} className="flex items-center gap-2.5 p-2"
+                             style={{ backgroundColor: colors.surface, border: `1px solid ${colors.border}` }}>
+                          <div style={{ width: 3, height: 18, backgroundColor: dm?.color || '#888' }} />
+                          <span className="font-mono" style={{ fontSize: 10, color: colors.muted, fontWeight: 500 }}>
+                            {d.id}
+                          </span>
+                          <span className="font-body" style={{ fontSize: 12, color: colors.ink, flex: 1 }}>
+                            {d.title}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <div className="font-mono mb-3" style={{
+                  fontSize: 10, color: colors.muted, letterSpacing: '0.1em', textTransform: 'uppercase'
+                }}>
+                  Unlocks ({dependents.length})
+                </div>
+                {dependents.length === 0 ? (
+                  <p className="font-body" style={{ fontSize: 12, color: colors.muted, fontStyle: 'italic' }}>
+                    No downstream tasks depend on this directly.
+                  </p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {dependents.map(d => {
+                      const dm = milestones[d.milestone];
+                      return (
+                        <div key={d.id} className="flex items-center gap-2.5 p-2"
+                             style={{ backgroundColor: colors.surface, border: `1px solid ${colors.border}` }}>
+                          <div style={{ width: 3, height: 18, backgroundColor: dm?.color || '#888' }} />
+                          <span className="font-mono" style={{ fontSize: 10, color: colors.muted, fontWeight: 500 }}>
+                            {d.id}
+                          </span>
+                          <span className="font-body" style={{ fontSize: 12, color: colors.ink, flex: 1 }}>
+                            {d.title}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // ====================================================================
+    // DASHBOARD
+    // ====================================================================
+
+    const Dashboard = ({ onReload }) => {
+      const [view, setView] = useState('timeline');
+      const [selectedTask, setSelectedTask] = useState(null);
+
+      useEffect(() => {
+        const handler = (e) => { if (e.key === 'Escape') setSelectedTask(null); };
+        window.addEventListener('keydown', handler);
+        return () => window.removeEventListener('keydown', handler);
+      }, []);
+
+      return (
+        <div className="font-body min-h-screen" style={{ backgroundColor: colors.bg, color: colors.ink }}>
+          <Header view={view} setView={setView} onReload={onReload} />
+          <MilestoneLegend />
+
+          {view === 'timeline' && <TimelineView onSelectTask={setSelectedTask} selectedTaskId={selectedTask?.id} />}
+          {view === 'dependencies' && <DependencyGraphView onSelectTask={setSelectedTask} selectedTaskId={selectedTask?.id} />}
+          {view === 'value' && <ValueMatrixView onSelectTask={setSelectedTask} selectedTaskId={selectedTask?.id} />}
+
+          <div className="px-10 py-6 mt-4" style={{ borderTop: `1px solid ${colors.border}` }}>
+            <div className="flex items-center justify-between font-mono text-xs" style={{ color: colors.muted }}>
+              <span>OBSERVABILITY & MONITORING — UNIFIED ROADMAP</span>
+              <span>Data source: roadmap-data.md · DRAFT</span>
+            </div>
+          </div>
+
+          {selectedTask && (
+            <Fragment>
+              <div className="fixed inset-0 z-40" style={{ backgroundColor: 'rgba(15, 20, 25, 0.15)' }}
+                   onClick={() => setSelectedTask(null)} />
+              <TaskDetailPanel task={selectedTask} onClose={() => setSelectedTask(null)} />
+            </Fragment>
+          )}
+        </div>
+      );
+    };
+
+    // ====================================================================
+    // APP / DATA LOADER
+    // ====================================================================
+
+    const STORAGE_KEY = 'roadmapDataMarkdown';
+
+    function App() {
+      const [data, setData] = useState(null);
+      const [needsLoad, setNeedsLoad] = useState(false);
+      const [fetchError, setFetchError] = useState(false);
+      const [bootstrapped, setBootstrapped] = useState(false);
+
+      const initialLoad = async () => {
+        // Try fetch (works when served via http(s)://)
+        try {
+          const res = await fetch('roadmap-data.md');
+          if (res.ok) {
+            const text = await res.text();
+            const parsed = parseRoadmapData(text);
+            try { localStorage.setItem(STORAGE_KEY, text); } catch (e) {}
+            setData(parsed);
+            setBootstrapped(true);
+            return;
+          }
+        } catch (e) {
+          setFetchError(true);
+        }
+
+        // Fallback: cached version from localStorage
+        try {
+          const cached = localStorage.getItem(STORAGE_KEY);
+          if (cached) {
+            setData(parseRoadmapData(cached));
+            setBootstrapped(true);
+            return;
+          }
+        } catch (e) {}
+
+        // No data anywhere; need user to pick file
+        setNeedsLoad(true);
+        setBootstrapped(true);
+      };
+
+      useEffect(() => {
+        initialLoad();
+      }, []);
+
+      // Hide loader once bootstrapped
+      useEffect(() => {
+        if (bootstrapped) {
+          const loader = document.getElementById('loader');
+          if (loader) {
+            loader.classList.add('hidden');
+            setTimeout(() => loader.remove(), 400);
+          }
+        }
+      }, [bootstrapped]);
+
+      const handleLoad = (text, parsed) => {
+        try { localStorage.setItem(STORAGE_KEY, text); } catch (e) {}
+        setData(parsed);
+        setNeedsLoad(false);
+      };
+
+      const handleReload = async () => {
+        // Try refetch
+        try {
+          const res = await fetch('roadmap-data.md', { cache: 'no-store' });
+          if (res.ok) {
+            const text = await res.text();
+            const parsed = parseRoadmapData(text);
+            try { localStorage.setItem(STORAGE_KEY, text); } catch (e) {}
+            setData(parsed);
+            return;
+          }
+        } catch (e) {}
+
+        // Fall back to file picker
+        setNeedsLoad(true);
+      };
+
+      if (!bootstrapped) return null;
+      if (needsLoad || !data) return <FileLoader onLoad={handleLoad} fetchError={fetchError} />;
+
+      return (
+        <DataContext.Provider value={data}>
+          <Dashboard onReload={handleReload} />
+        </DataContext.Provider>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
